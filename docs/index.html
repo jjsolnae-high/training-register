@@ -121,7 +121,6 @@
     <div class="brandrow">
       <div class="topline">
         <img class="emblem" id="emblemImg" style="display:none;" alt="교표">
-        <div class="school-h" id="schoolLabel"></div>
       </div>
       <div class="brandtitle">연수 참석 등록</div>
     </div>
@@ -281,7 +280,6 @@ if (!API) {
   var META = { date: qs.get('date') || '', method: qs.get('method') || '', target: qs.get('target') || '' };
 
   document.title = eventTitle;
-  document.getElementById('schoolLabel').textContent = SCHOOL_NAME;
   document.getElementById('schoolField').textContent = SCHOOL_NAME;
   document.getElementById('footerSchool').textContent = '© ' + SCHOOL_NAME;
   document.getElementById('adminLink').href = API + '?mode=admin';
