@@ -30,6 +30,11 @@ const CONFIG = {
   // 로그인된 크롬에서 "파일을 열 수 없습니다" 오류가 날 수 있음 — getWebAppUrl_ 참고).
   // 이 저장소의 register.html을 그대로 쓰면 값을 바꿀 필요 없다(여러 학교가 공유).
   PUBLIC_REGISTER_URL: 'https://jjsolnae-high.github.io/training-register/',
+  // 정적 등록 페이지가 구글 앱스스크립트를 거치지 않고 바로 쓸 교표 주소.
+  // 비우면('') ?mode=emblem으로 매번 물어봐서 로고가 늦게 뜬다. 직접 준비할
+  // 수 있는 학교는 여백 없이 자른 로고 파일을 어딘가(예: 이 저장소의 docs/assets/)에
+  // 올리고 그 주소를 넣으면 된다.
+  PUBLIC_LOGO_URL: '',
   AUTHUSER: '0',                        // 링크에 authuser 파라미터 자동 추가(계정 꼬임 방지). 비우면('') 미추가
   DEFAULT_POSITIONS: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
   POSITION_ORDER: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
@@ -444,6 +449,7 @@ function buildRegisterLink(params) {
   const usePublic = !!CONFIG.PUBLIC_REGISTER_URL;
   const base = usePublic ? CONFIG.PUBLIC_REGISTER_URL : getWebAppUrl_();
   const q = usePublic ? ['api=' + encodeURIStrict_(getWebAppUrl_())] : ['mode=register'];
+  if (usePublic && CONFIG.PUBLIC_LOGO_URL) q.push('logo=' + encodeURIStrict_(CONFIG.PUBLIC_LOGO_URL));
   if (params.title)    q.push('title='    + encodeURIStrict_(params.title));
   if (params.events)   q.push('events='   + encodeURIStrict_(encodeList_(params.events)));
   if (params.admins)   q.push('admins='   + encodeURIStrict_(encodeRaw_(params.admins)));
