@@ -25,6 +25,8 @@
     margin:6px 16px 14px;box-shadow:0 6px 20px rgba(20,40,90,.08);}
   .brandhead{padding:20px 16px 8px;background:transparent;}
   .brandrow{text-align:center;}
+  .topline{display:inline-flex;align-items:center;gap:8px;}
+  .emblem{height:32px;width:auto;display:block;}
   .school-h{font-size:14px;font-weight:700;color:var(--navy);display:block;}
   .brandtitle{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:2px;margin-top:4px;}
   .field{margin-bottom:20px;}
@@ -117,7 +119,10 @@
 <div class="wrap">
   <div class="brandhead">
     <div class="brandrow">
-      <div class="school-h" id="schoolLabel"></div>
+      <div class="topline">
+        <img class="emblem" id="emblemImg" style="display:none;" alt="교표">
+        <div class="school-h" id="schoolLabel"></div>
+      </div>
       <div class="brandtitle">연수 참석 등록</div>
     </div>
   </div>
@@ -281,6 +286,18 @@ if (!API) {
   document.getElementById('footerSchool').textContent = '© ' + SCHOOL_NAME;
   document.getElementById('adminLink').href = API + '?mode=admin';
   document.getElementById('footerArea').style.display = 'flex';
+
+  // 교표는 URL에 실으면 QR이 감당 못 할 만큼 커져서, 별도로 물어본다(없으면 그냥 학교명만).
+  fetch(API + '?mode=emblem')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.emblem) {
+        var img = document.getElementById('emblemImg');
+        img.src = d.emblem;
+        img.style.display = 'block';
+      }
+    })
+    .catch(function () { /* 교표 없이도 등록은 정상 동작 */ });
 
   var eventArea = document.getElementById('eventArea');
   if (EVENT_LIST.length > 1) {
