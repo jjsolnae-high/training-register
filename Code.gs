@@ -73,6 +73,12 @@ function doGet(e) {
   const p = (e && e.parameter) ? e.parameter : {};
   const mode = p.mode || 'register';
 
+  if (mode === 'emblem') {
+    // 정적 등록 페이지(docs/index.html)는 URL에 교표를 통째로 못 실어(QR이 감당 못 함)
+    // 이 엔드포인트로 따로 물어본다.
+    return jsonOut_({ emblem: getEmblem_() });
+  }
+
   if (mode === 'admin') {
     const t = HtmlService.createTemplateFromFile('Admin');
     t.webAppUrl = getWebAppUrl_();
