@@ -29,7 +29,7 @@ const CONFIG = {
   // 예전처럼 script.google.com 링크를 그대로 쓴다(GAS 자체 서빙, 계정 여러 개
   // 로그인된 크롬에서 "파일을 열 수 없습니다" 오류가 날 수 있음 — getWebAppUrl_ 참고).
   // 이 저장소의 register.html을 그대로 쓰면 값을 바꿀 필요 없다(여러 학교가 공유).
-  PUBLIC_REGISTER_URL: 'https://yerang-k.github.io/training-register/',
+  PUBLIC_REGISTER_URL: 'https://jjsolnae-high.github.io/training-register/',
   AUTHUSER: '0',                        // 링크에 authuser 파라미터 자동 추가(계정 꼬임 방지). 비우면('') 미추가
   DEFAULT_POSITIONS: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
   POSITION_ORDER: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
