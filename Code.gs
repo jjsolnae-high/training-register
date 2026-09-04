@@ -158,6 +158,10 @@ function registerAttendance(data) {
     return { name: String(e).trim(), admin: '', dept: '' };
   }).filter(function (e) { return e.name; });
   if (!events.length) throw new Error('등록할 연수가 선택되지 않았습니다.');
+  const closedNames = events.filter(function (e) { return isEventClosed_(sheetNameFor_(e.name)); }).map(function (e) { return e.name; });
+  if (closedNames.length) {
+    throw new Error('담당자가 등록을 마감한 연수입니다: ' + closedNames.join(', '));
+  }
 
   const meta = data.meta || {};
   const ss = openSpreadsheet_();
@@ -360,8 +364,38 @@ function listEventSheets(params) {
   requireAdmin_(params);
   const ss = openSpreadsheet_();
   return eventSheets_(ss).map(function (s) {
-    return { name: s.getName(), rows: Math.max(0, s.getLastRow() - (DATA_START_ROW - 1)) };
+    return { name: s.getName(), rows: Math.max(0, s.getLastRow() - (DATA_START_ROW - 1)), closed: isEventClosed_(s.getName()) };
   });
+}
+
+/* ===================== 등록 마감 =====================
+ * 연수가 끝난 뒤에도 링크가 살아있으면 계속 등록이 들어와 혼란을 준다.
+ * 담당자가 "명단 조회"에서 원하는 시점에 마감/재개를 누를 수 있게 한다.
+ * 시트 안에 상태를 두면(셀 등) 서식이 꼬일 수 있어, 스크립트 속성에
+ * "마감된 시트 이름 목록"만 따로 둔다.
+ */
+const CLOSED_EVENTS_PROP = 'CLOSED_EVENTS';
+
+function getClosedSet_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(CLOSED_EVENTS_PROP);
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch (e) { return []; }
+}
+
+function isEventClosed_(sheetName) {
+  return getClosedSet_().indexOf(sheetName) !== -1;
+}
+
+/** 담당자: 연수 하나의 마감 상태를 뒤집는다. 마감된 새 상태를 돌려준다. */
+function toggleEventClosed(params) {
+  requireAdmin_(params);
+  const sheetName = sheetNameFor_(params.eventTitle);
+  const set = getClosedSet_();
+  const i = set.indexOf(sheetName);
+  const nowClosed = i === -1;
+  if (nowClosed) set.push(sheetName); else set.splice(i, 1);
+  PropertiesService.getScriptProperties().setProperty(CLOSED_EVENTS_PROP, JSON.stringify(set));
+  return { closed: nowClosed };
 }
 
 /**

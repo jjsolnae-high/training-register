@@ -131,8 +131,9 @@
     <div class="rowbtn">
       <button class="btn" id="loadBtn">명단 불러오기</button>
       <button class="btn ghost" id="printBtn">2단 인쇄본 만들기</button>
+      <button class="btn ghost" id="closeBtn">마감하기</button>
     </div>
-    <div class="hint">'2단 인쇄본 만들기'를 누르면 순·직위·성명·서명을 좌·우 2단으로 배치한 <b>「연수명 (인쇄)」</b> 시트가 생성됩니다.</div>
+    <div class="hint">'2단 인쇄본 만들기'를 누르면 순·직위·성명·서명을 좌·우 2단으로 배치한 <b>「연수명 (인쇄)」</b> 시트가 생성됩니다. '마감하기'를 누르면 이 연수는 그 즉시 등록 링크로 더 이상 등록할 수 없습니다(다시 눌러 재개 가능).</div>
     <div class="err" id="l_err"></div>
     <div id="result"></div>
   </div>
@@ -164,23 +165,53 @@
   });
 
   /* 연수(시트 탭) 목록 드롭다운 채우기 */
+  var closedMap = {};   // 시트명 -> 마감 여부
   function loadSheetList(){
     if(!ADMIN_PW) return;
     google.script.run
       .withSuccessHandler(function(list){
         var sel = document.getElementById('l_title');
         var cur = sel.value;
+        closedMap = {};
         var html = '<option value="">— 연수를 선택하세요 —</option>';
         (list||[]).forEach(function(s){
           if(/\(인쇄\)\s*$/.test(s.name)) return;   // 인쇄본 시트 제외
-          html += '<option value="'+esc(s.name)+'">'+esc(s.name)+' ('+s.rows+'명)</option>';
+          closedMap[s.name] = !!s.closed;
+          html += '<option value="'+esc(s.name)+'">'+esc(s.name)+' ('+s.rows+'명)'+(s.closed?' · 마감됨':'')+'</option>';
         });
         sel.innerHTML = html;
         if(cur) sel.value = cur;
+        updateCloseBtn();
       })
       .withFailureHandler(function(){})
       .listEventSheets({password:ADMIN_PW});
   }
+
+  /* 마감/재개 버튼 라벨을 선택된 연수 상태에 맞춘다 */
+  function updateCloseBtn(){
+    var name = document.getElementById('l_title').value;
+    var btn = document.getElementById('closeBtn');
+    btn.disabled = !name;
+    btn.textContent = (name && closedMap[name]) ? '재개하기' : '마감하기';
+  }
+  document.getElementById('l_title').addEventListener('change', updateCloseBtn);
+
+  document.getElementById('closeBtn').onclick = function(){
+    var name = document.getElementById('l_title').value;
+    var errEl = document.getElementById('l_err'); errEl.textContent = '';
+    if(!name){ errEl.textContent = '연수를 먼저 선택하세요.'; return; }
+    var btn = document.getElementById('closeBtn');
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function(r){
+        loadSheetList();
+      })
+      .withFailureHandler(function(e){
+        btn.disabled = false;
+        errEl.textContent = (e && e.message) ? e.message : '처리 중 오류가 발생했습니다.';
+      })
+      .toggleEventClosed({password: ADMIN_PW, eventTitle: name});
+  };
 
   /* 탭 전환 */
   var tabs = document.querySelectorAll('.tab');
