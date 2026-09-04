@@ -25,7 +25,7 @@
     margin:6px 16px 14px;box-shadow:0 6px 20px rgba(20,40,90,.08);}
   .brandhead{padding:20px 16px 4px;background:transparent;}
   .brandrow{text-align:center;}
-  .emblem{height:132px;width:auto;display:inline-block;}
+  .emblem{height:80px;width:auto;display:inline-block;}
   .school-h{font-size:14px;font-weight:700;color:var(--navy);display:block;}
   .brandtitle{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:2px;margin-top:-4px;}
   .field{margin-bottom:20px;}
@@ -287,12 +287,53 @@ if (!API) {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (d && d.emblem) {
-        var img = document.getElementById('emblemImg');
-        img.src = d.emblem;
-        img.style.display = 'inline-block';
+        cropTransparentPadding_(d.emblem, function (cropped) {
+          var img = document.getElementById('emblemImg');
+          img.src = cropped;
+          img.style.display = 'inline-block';
+        });
       }
     })
     .catch(function () { /* 교표 없이도 등록은 정상 동작 */ });
+
+  /**
+   * 학교 로고 PNG는 정사각형 캔버스 한가운데에 가로로 긴 그림이 있고 위아래가
+   * 넓게 투명해서(이 학교 로고 기준 실제 그림은 세로로 23%뿐), height로만
+   * 키우면 투명한 여백까지 같이 커져서 정작 그림은 작아 보인다.
+   * 투명하지 않은 픽셀의 경계만 잘라내 실제 그림 크기로 다시 그린다.
+   */
+  function cropTransparentPadding_(dataUrl, callback) {
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      var d;
+      try { d = ctx.getImageData(0, 0, c.width, c.height).data; }
+      catch (e) { callback(dataUrl); return; }
+      var minX = c.width, minY = c.height, maxX = 0, maxY = 0, step = 4;
+      for (var y = 0; y < c.height; y += step) {
+        for (var x = 0; x < c.width; x += step) {
+          if (d[(y * c.width + x) * 4 + 3] > 10) {
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX <= minX || maxY <= minY) { callback(dataUrl); return; }
+      var pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.04);
+      minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+      maxX = Math.min(c.width, maxX + pad); maxY = Math.min(c.height, maxY + pad);
+      var w = maxX - minX, h = maxY - minY;
+      var out = document.createElement('canvas');
+      out.width = w; out.height = h;
+      out.getContext('2d').drawImage(c, minX, minY, w, h, 0, 0, w, h);
+      callback(out.toDataURL('image/png'));
+    };
+    img.onerror = function () { callback(dataUrl); };
+    img.src = dataUrl;
+  }
 
   var eventArea = document.getElementById('eventArea');
   if (EVENT_LIST.length > 1) {
