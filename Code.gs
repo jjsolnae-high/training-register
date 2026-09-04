@@ -25,6 +25,11 @@ const CONFIG = {
   SCHOOL_NAME_EN: 'Jeonju Solnae High School',  // 등록 화면 교표 옆 영문명
   SYSTEM_TITLE: '통합연수등록시스템',       // 등록 화면 상단 큰 제목
   REPORT_TITLE: '교직원 연수 등록부',       // 등록부(시트) 상단 제목
+  // 참석자용 등록 링크를 script.google.com 대신 여기로 발급한다. 비우면('')
+  // 예전처럼 script.google.com 링크를 그대로 쓴다(GAS 자체 서빙, 계정 여러 개
+  // 로그인된 크롬에서 "파일을 열 수 없습니다" 오류가 날 수 있음 — getWebAppUrl_ 참고).
+  // 이 저장소의 register.html을 그대로 쓰면 값을 바꿀 필요 없다(여러 학교가 공유).
+  PUBLIC_REGISTER_URL: 'https://yerang-k.github.io/training-register/',
   AUTHUSER: '0',                        // 링크에 authuser 파라미터 자동 추가(계정 꼬임 방지). 비우면('') 미추가
   DEFAULT_POSITIONS: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
   POSITION_ORDER: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
@@ -99,6 +104,34 @@ function doGet(e) {
     .setTitle(t.eventTitle)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * GitHub Pages 등에 올린 정적 등록 화면이 fetch()로 호출하는 API 진입점.
+ * script.google.com이 아닌 도메인에서 서빙해야 크롬의 /u/<번호>/ 계정 슬롯
+ * 오작동(getWebAppUrl_ 주석 참고)을 원천적으로 피할 수 있어서 만들었다.
+ * Content-Type을 text/plain으로 보내야 브라우저가 프리플라이트(OPTIONS)를
+ * 안 띄운다 — Apps Script는 OPTIONS 요청을 처리하지 않는다.
+ */
+function doPost(e) {
+  let body;
+  try {
+    body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+  } catch (err) {
+    return jsonOut_({ error: '요청 형식이 올바르지 않습니다.' });
+  }
+  try {
+    if (body.action === 'register') {
+      return jsonOut_(registerAttendance(body.payload));
+    }
+    return jsonOut_({ error: '알 수 없는 요청입니다.' });
+  } catch (err) {
+    return jsonOut_({ error: (err && err.message) || String(err) });
+  }
+}
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
 /* ===================== 등록 처리 ===================== */
@@ -349,21 +382,38 @@ function firstEventSheet_(ss) {
   return list.length ? list[0] : null;
 }
 
+/**
+ * encodeURIComponent는 ! ' ( ) * 를 인코딩하지 않고 그대로 통과시킨다(MDN에 문서화된 결함).
+ * "2026.9.23.(수)15:30"처럼 요일을 괄호로 넣는 날짜 표기가 이 앱에서 흔한데,
+ * 괄호가 날것으로 남은 QR 링크는 일부 기기(특히 아이폰 카메라)의 URL 파서를 깨뜨려
+ * "파일을 열 수 없습니다" 구글 드라이브 오류로 이어진다. 그 6개 문자까지 마저 인코딩한다.
+ */
+function encodeURIStrict_(str) {
+  return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
+    return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+  });
+}
+
 /* ===================== 관리자: 등록 링크 생성 ===================== */
 function buildRegisterLink(params) {
   requireAdmin_(params);
-  const base = getWebAppUrl_();
-  const q = ['mode=register'];
-  if (params.title)    q.push('title='    + encodeURIComponent(params.title));
-  if (params.events)   q.push('events='   + encodeURIComponent(encodeList_(params.events)));
-  if (params.admins)   q.push('admins='   + encodeURIComponent(encodeRaw_(params.admins)));
-  if (params.school)   q.push('school='   + encodeURIComponent(params.school));
-  if (params.date)     q.push('date='     + encodeURIComponent(params.date));
-  if (params.method)   q.push('method='   + encodeURIComponent(params.method));
-  if (params.target)   q.push('target='   + encodeURIComponent(params.target));
-  if (params.depts)    q.push('depts='    + encodeURIComponent(encodeRaw_(params.depts)));
-  if (params.positions) q.push('pos=' + encodeURIComponent(encodeList_(params.positions)));
-  if (CONFIG.AUTHUSER) q.push('authuser=' + encodeURIComponent(CONFIG.AUTHUSER));
+  // PUBLIC_REGISTER_URL이 있으면 참석자 링크를 script.google.com이 아니라
+  // 거기(GitHub Pages 등 정적 페이지)로 발급한다. 그 페이지는 이 웹앱을
+  // api= 파라미터로 받아 fetch()로만 호출하므로, mode=register 대신
+  // api 파라미터가 필요하고, 계정 슬롯과 무관해지므로 authuser는 의미가 없다.
+  const usePublic = !!CONFIG.PUBLIC_REGISTER_URL;
+  const base = usePublic ? CONFIG.PUBLIC_REGISTER_URL : getWebAppUrl_();
+  const q = usePublic ? ['api=' + encodeURIStrict_(getWebAppUrl_())] : ['mode=register'];
+  if (params.title)    q.push('title='    + encodeURIStrict_(params.title));
+  if (params.events)   q.push('events='   + encodeURIStrict_(encodeList_(params.events)));
+  if (params.admins)   q.push('admins='   + encodeURIStrict_(encodeRaw_(params.admins)));
+  if (params.school)   q.push('school='   + encodeURIStrict_(params.school));
+  if (params.date)     q.push('date='     + encodeURIStrict_(params.date));
+  if (params.method)   q.push('method='   + encodeURIStrict_(params.method));
+  if (params.target)   q.push('target='   + encodeURIStrict_(params.target));
+  if (params.depts)    q.push('depts='    + encodeURIStrict_(encodeRaw_(params.depts)));
+  if (params.positions) q.push('pos=' + encodeURIStrict_(encodeList_(params.positions)));
+  if (!usePublic && CONFIG.AUTHUSER) q.push('authuser=' + encodeURIStrict_(CONFIG.AUTHUSER));
   return base + '?' + q.join('&');
 }
 
@@ -750,7 +800,20 @@ function sheetNameFor_(title) {
 }
 
 function getWebAppUrl_() {
-  try { return ScriptApp.getService().getUrl(); }
+  try {
+    const url = ScriptApp.getService().getUrl();
+    // 학교(워크스페이스) 계정 소유 스크립트는 getUrl()이 가끔
+    // https://script.google.com/a/도메인/macros/s/../exec 형태의 "도메인 전용" 주소를
+    // 돌려준다. 그 도메인 계정으로 로그인하지 않은 방문자(대부분의 QR 스캔 사용자)가
+    // 이 주소를 열면 "파일을 열 수 없습니다" 구글 드라이브 오류가 뜬다.
+    // 배포는 그대로 두고, 누구나 열 수 있는 일반 주소로만 정규화한다.
+    //
+    // ※ /u/<번호>/ 계정 슬롯을 링크에 직접 박아 넣는 시도는 하지 않는다.
+    //   그 번호로 로그인돼 있지 않은 사람(로그아웃 상태 포함) 전원이
+    //   똑같은 "파일을 열 수 없습니다" 오류를 겪는 것으로 실제 확인됐다.
+    //   /u/ 세그먼트가 아예 없는 순수 주소만 로그인 여부와 무관하게 항상 열린다.
+    return url.replace(/^(https:\/\/script\.google\.com)\/a\/[^/]+\//, '$1/');
+  }
   catch (err) { return ''; }
 }
 
