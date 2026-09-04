@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>연수 참석 등록</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#14346e; --blue:#1a4fb4; --blue-2:#3b74e0; --blue-soft:#eef3fc;
+    --ink:#1e293b; --muted:#64748b; --line:#e4e9f2; --bg:#eef2f8;
+    --red:#e23b3b; --green:#16a34a; --ring:rgba(26,79,180,.14);
+    --sky:#e8f1fc; --sky-line:#d3e2f6;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;color:var(--ink);
+    background:#e6f0fb;
+    font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:500px;margin:0 auto;min-height:100vh;background:transparent;
+    display:flex;flex-direction:column;}
+  .content{padding:24px 22px 22px;background:#fff;border-radius:18px;
+    margin:6px 16px 14px;box-shadow:0 6px 20px rgba(20,40,90,.08);}
+  .brandhead{padding:20px 16px 8px;background:transparent;}
+  .brandrow{text-align:center;}
+  .school-h{font-size:14px;font-weight:700;color:var(--navy);display:block;}
+  .brandtitle{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:2px;margin-top:4px;}
+  .field{margin-bottom:20px;}
+  .label{display:flex;align-items:center;gap:9px;
+    font-size:15px;font-weight:700;color:var(--navy);margin-bottom:10px;}
+  .label .req{color:var(--red);margin-left:-3px;}
+  .label svg{width:20px;height:20px;flex:none;padding:5px;border-radius:9px;
+    background:var(--blue-soft);box-sizing:content-box;}
+  select,input[type=text]{width:100%;border:1.5px solid var(--sky-line);
+    background:var(--sky);border-radius:14px;padding:15px 16px;font-size:16px;color:var(--ink);
+    font-family:inherit;outline:none;appearance:none;transition:border-color .15s,box-shadow .15s,background .15s;}
+  select:focus,input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px var(--ring);}
+  input::placeholder{color:#8aa0c0;}
+  .schoolname{font-size:18px;font-weight:700;color:var(--ink);letter-spacing:.2px;
+    background:#fff;border:1px solid #dbe6fb;border-radius:14px;padding:13px 16px;}
+  .evtlist{border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;}
+  .evtlist label{display:flex;align-items:center;gap:12px;padding:15px 16px;
+    font-size:16px;cursor:pointer;border-top:1px solid var(--line);transition:background .12s;}
+  .evtlist label:first-child{border-top:none;}
+  .evtlist label:hover{background:#f7faff;}
+  .evtlist input[type=checkbox]{width:21px;height:21px;accent-color:var(--blue);flex:none;}
+  .evt-admin{font-size:13px;font-weight:600;color:var(--muted);}
+  .evtone{font-size:18px;font-weight:700;color:var(--ink);
+    background:#fff;border:1px solid #dbe6fb;border-radius:14px;padding:15px 16px;}
+  .sighint{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);
+    flex:1;min-width:0;line-height:1.35;margin-top:8px;padding-left:2px;}
+  .selectbox{position:relative;}
+  .selectbox::after{content:"";position:absolute;right:18px;top:50%;
+    width:9px;height:9px;border-right:2px solid #8798ad;border-bottom:2px solid #8798ad;
+    transform:translateY(-70%) rotate(45deg);pointer-events:none;}
+  .sigwrap{border:1.5px solid var(--sky-line);border-radius:14px;overflow:hidden;background:var(--sky);
+    box-shadow:0 1px 3px rgba(20,40,90,.05);}
+  canvas{display:block;width:100%;height:220px;touch-action:none;background:#fff;}
+  .sigbar{display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:11px 12px;background:#dfeafb;border-top:1px solid var(--sky-line);}
+  .sigbar .sighint{margin-top:0;padding-left:0;}
+  .sighint svg{flex:none;}
+  .signote{font-size:13px;color:var(--muted);font-weight:400;white-space:nowrap;}
+  .btn-clear{display:flex;align-items:center;gap:6px;background:#fff;
+    border:1.5px solid var(--line);border-radius:10px;padding:9px 14px;
+    font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;transition:.12s;
+    flex:none;white-space:nowrap;}
+  .btn-clear:hover{border-color:#c3cee0;background:#f8fbff;}
+  .submit{width:100%;border:none;color:#fff;letter-spacing:.3px;
+    background:linear-gradient(135deg,var(--blue) 0%,var(--blue-2) 100%);
+    font-size:18px;font-weight:800;padding:18px;border-radius:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    box-shadow:0 10px 22px rgba(26,79,180,.30);transition:transform .12s,box-shadow .12s,filter .12s;}
+  .submit:hover{transform:translateY(-1px);box-shadow:0 14px 26px rgba(26,79,180,.34);}
+  .submit:active{transform:translateY(0);filter:brightness(.96);}
+  .submit:disabled{opacity:.6;cursor:not-allowed;box-shadow:none;transform:none;}
+  footer{display:flex;align-items:center;justify-content:space-between;
+    padding:12px 24px 20px;font-size:13px;color:var(--muted);}
+  footer a{color:var(--muted);text-decoration:none;display:flex;align-items:center;gap:5px;
+    padding:6px 10px;border-radius:8px;transition:.12s;}
+  footer a:hover{background:var(--blue-soft);color:var(--blue);}
+  .done{text-align:center;padding:28px 22px 18px;background:#fff;border-radius:18px;
+    margin:6px 16px 14px;box-shadow:0 6px 20px rgba(20,40,90,.08);animation:fade .35s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;}}
+  .check{width:92px;height:92px;border-radius:50%;border:none;
+    background:radial-gradient(circle at 50% 40%,#eafaf0,#d8f5e3);
+    box-shadow:0 8px 20px rgba(22,163,74,.22);
+    margin:6px auto 18px;display:flex;align-items:center;justify-content:center;}
+  .check svg{width:48px;height:48px;stroke:var(--green);}
+  .done h2{font-size:26px;font-weight:800;color:var(--navy);margin:0 0 6px;}
+  .done .sub{color:var(--muted);font-size:15px;margin-bottom:24px;}
+  .cert{position:relative;border:1.5px solid #e2e8f4;border-radius:18px;
+    padding:26px 22px;text-align:left;box-shadow:0 6px 24px rgba(20,40,90,.07);
+    background:#fff radial-gradient(circle,#eef1f7 1px,transparent 1.4px) 0 0/16px 16px;}
+  .cert h3{text-align:center;font-size:20px;font-weight:800;color:var(--navy);margin:2px 0 4px;}
+  .cert .hr{height:2px;border-radius:2px;margin:12px 0 18px;
+    background:linear-gradient(90deg,var(--blue),var(--blue-2));}
+  .stamp{position:absolute;top:16px;right:14px;color:var(--red);
+    border:2px solid var(--red);border-radius:8px;padding:4px 8px;
+    font-size:13px;font-weight:800;transform:rotate(8deg);opacity:.85;}
+  .row{display:flex;gap:10px;margin-bottom:15px;font-size:16px;}
+  .row .k{flex:none;width:96px;color:var(--muted);font-weight:700;letter-spacing:2px;}
+  .row .v{flex:1;color:var(--ink);font-weight:600;}
+  .row .v img{height:44px;vertical-align:middle;}
+  .back{width:100%;margin-top:20px;background:#eef2f8;border:1px solid #e2e8f4;border-radius:16px;
+    padding:16px;font-size:16px;font-weight:700;color:#41506b;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;transition:.12s;}
+  .back:hover{background:#e6ecf6;}
+  .err{color:var(--red);font-size:14px;margin-top:8px;text-align:center;min-height:18px;font-weight:600;}
+  .apierr{max-width:500px;margin:40px auto;padding:24px;text-align:center;color:var(--red);
+    font-size:15px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brandhead">
+    <div class="brandrow">
+      <div class="school-h" id="schoolLabel"></div>
+      <div class="brandtitle">연수 참석 등록</div>
+    </div>
+  </div>
+
+  <div id="apiErr" class="apierr" style="display:none;">
+    이 등록 링크에는 연동 정보가 없습니다.<br>담당자 화면의 "링크 발급"으로 다시 만든 링크를 사용해 주세요.
+  </div>
+
+  <div id="formView" class="content" style="display:none;">
+    <div class="field">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/></svg>
+        소속
+      </div>
+      <div class="schoolname" id="schoolField"></div>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+        등록할 연수 <span class="req">*</span>
+      </div>
+      <div id="eventArea"></div>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h4M7 12h10M7 16h10"/></svg>
+        직위 <span class="req">*</span>
+      </div>
+      <div class="selectbox">
+        <select id="position">
+          <option value="">직위를 선택하세요</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 16 0v1"/></svg>
+        성명 <span class="req">*</span>
+      </div>
+      <input type="text" id="name" placeholder="성명을 입력하세요" autocomplete="name">
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        서명 <span class="req">*</span>
+        <span class="signote">이름을 정자로 기입해 주세요.</span>
+      </div>
+      <div class="sigwrap">
+        <canvas id="sig"></canvas>
+        <div class="sigbar">
+          <span class="sighint">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6b7280" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+            이 공간에 터치하거나 드래그하여 서명하세요.
+          </span>
+          <button type="button" class="btn-clear" id="clearSig">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#334" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            지우기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="err" id="err"></div>
+    <button class="submit" id="submitBtn">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+      등록하기
+    </button>
+  </div>
+
+  <div id="doneView" class="done" style="display:none;">
+    <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l6 6L20 6"/></svg></div>
+    <h2>등록 완료</h2>
+    <div class="sub">출결 등록이 성공적으로 처리되었습니다.</div>
+    <div class="cert">
+      <div class="stamp">등록확인</div>
+      <h3>연수 참석 등록 확인증</h3>
+      <div class="hr"></div>
+      <div class="row"><div class="k">등록 연수</div><div class="v" id="c_events"></div></div>
+      <div class="row"><div class="k">소속기관</div><div class="v" id="c_org"></div></div>
+      <div class="row"><div class="k">직 위</div><div class="v" id="c_pos"></div></div>
+      <div class="row"><div class="k">성명/서명</div><div class="v" id="c_name"></div></div>
+      <div class="row"><div class="k">등록시간</div><div class="v" id="c_time"></div></div>
+    </div>
+    <button class="back" id="backBtn">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#334" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      처음으로 돌아가기
+    </button>
+  </div>
+
+  <footer id="footerArea" style="display:none;">
+    <span id="footerSchool"></span>
+    <a id="adminLink" href="#" target="_top">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#6b7280" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      담당자 메뉴
+    </a>
+  </footer>
+</div>
+
+<script>
+/*
+ * 이 페이지는 GitHub Pages(또는 다른 정적 호스팅)에서 직접 서빙되며,
+ * Google Apps Script(GAS) 웹앱은 데이터 저장용 API로만 fetch() 호출한다.
+ * 이렇게 나눈 이유: script.google.com 주소를 직접 열면, 크롬에 구글 계정이
+ * 여러 개 로그인된 기기에서 크롬이 임의로 /u/<번호>/ 계정 슬롯을 끼워 넣다가
+ * 그 슬롯이 꼬여 있으면 "현재 파일을 열 수 없습니다" 구글 드라이브 오류가 뜬다.
+ * script.google.com이 아닌 도메인에서 서빙하면 이 문제 자체가 생기지 않는다.
+ */
+
+function webSafeB64Decode(s) {
+  if (!s) return '';
+  var b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  try {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch (e) { return ''; }
+}
+function decodeCsvList(param) {
+  if (!param) return [];
+  return webSafeB64Decode(param).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+}
+function decodeCsvRaw(param) {
+  if (!param) return [];
+  return webSafeB64Decode(param).split(',').map(function (s) { return s.trim(); });
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  });
+}
+
+var qs = new URLSearchParams(location.search);
+var API = qs.get('api') || '';
+
+if (!API) {
+  document.getElementById('apiErr').style.display = 'block';
+} else {
+  var DEFAULT_POSITIONS = ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'];
+
+  var evNames = decodeCsvList(qs.get('events'));
+  if (!evNames.length && qs.get('title')) evNames = [qs.get('title')];
+  if (!evNames.length) evNames = ['연수 참석 등록'];
+  var evAdmins = decodeCsvRaw(qs.get('admins'));
+  var evDepts = decodeCsvRaw(qs.get('depts'));
+  var EVENT_LIST = evNames.map(function (n, i) { return { name: n, admin: evAdmins[i] || '', dept: evDepts[i] || '' }; });
+  var eventTitle = qs.get('title') || (evNames.length === 1 ? evNames[0] : '연수 참석 등록');
+  var SCHOOL_NAME = qs.get('school') || '';
+  var positions = decodeCsvList(qs.get('pos'));
+  if (!positions.length) positions = DEFAULT_POSITIONS;
+  var META = { date: qs.get('date') || '', method: qs.get('method') || '', target: qs.get('target') || '' };
+
+  document.title = eventTitle;
+  document.getElementById('schoolLabel').textContent = SCHOOL_NAME;
+  document.getElementById('schoolField').textContent = SCHOOL_NAME;
+  document.getElementById('footerSchool').textContent = '© ' + SCHOOL_NAME;
+  document.getElementById('adminLink').href = API + '?mode=admin';
+  document.getElementById('footerArea').style.display = 'flex';
+
+  var eventArea = document.getElementById('eventArea');
+  if (EVENT_LIST.length > 1) {
+    var box = document.createElement('div');
+    box.className = 'evtlist';
+    EVENT_LIST.forEach(function (ev) {
+      var label = document.createElement('label');
+      label.innerHTML =
+        '<input type="checkbox" class="evt-check" value="' + escapeHtml(ev.name) + '" data-admin="' + escapeHtml(ev.admin) + '" data-dept="' + escapeHtml(ev.dept) + '" checked>' +
+        '<span>' + escapeHtml(ev.name) + (ev.admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(ev.admin) + '</small>' : '') + '</span>';
+      box.appendChild(label);
+    });
+    eventArea.appendChild(box);
+    var hint = document.createElement('div');
+    hint.className = 'sighint';
+    hint.textContent = '참석한 연수를 모두 선택하세요. (기본: 전체 선택)';
+    eventArea.appendChild(hint);
+  } else {
+    var one = document.createElement('div');
+    one.className = 'evtone';
+    one.innerHTML = escapeHtml(EVENT_LIST[0].name) + (EVENT_LIST[0].admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(EVENT_LIST[0].admin) + '</small>' : '');
+    eventArea.appendChild(one);
+  }
+
+  var posSelect = document.getElementById('position');
+  positions.forEach(function (p) {
+    var opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    posSelect.appendChild(opt);
+  });
+
+  document.getElementById('formView').style.display = 'block';
+
+  /* ---- 서명 캔버스 ---- */
+  var canvas = document.getElementById('sig');
+  var ctx = canvas.getContext('2d');
+  var drawing = false, hasSign = false, last = null;
+
+  function fitCanvas() {
+    var ratio = window.devicePixelRatio || 1;
+    var w = canvas.offsetWidth, h = canvas.offsetHeight;
+    if (!w || !h) return;
+    canvas.width = w * ratio; canvas.height = h * ratio;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#12233f';
+  }
+  window.addEventListener('load', fitCanvas);
+  setTimeout(fitCanvas, 60);
+
+  function pos(e) {
+    var r = canvas.getBoundingClientRect();
+    var t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function start(e) { e.preventDefault(); if (!canvas.width) fitCanvas(); drawing = true; last = pos(e); }
+  function move(e) {
+    if (!drawing) return; e.preventDefault();
+    var p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; hasSign = true;
+  }
+  function end() { drawing = false; }
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+  document.getElementById('clearSig').onclick = function () {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); hasSign = false;
+  };
+  window.addEventListener('resize', function () {
+    var data = hasSign ? canvas.toDataURL() : null;
+    fitCanvas();
+    if (data) { var img = new Image(); img.onload = function () { ctx.drawImage(img, 0, 0, canvas.offsetWidth, canvas.offsetHeight); }; img.src = data; }
+  });
+
+  /* ---- 제출 ---- */
+  var btn = document.getElementById('submitBtn');
+  var errEl = document.getElementById('err');
+  btn.onclick = function () {
+    errEl.textContent = '';
+    var events = [];
+    var boxes = document.querySelectorAll('.evt-check');
+    if (boxes.length) { boxes.forEach(function (b) { if (b.checked) events.push({ name: b.value, admin: b.getAttribute('data-admin') || '', dept: b.getAttribute('data-dept') || '' }); }); }
+    else { events = EVENT_LIST.slice(); }
+    if (!events.length) { errEl.textContent = '등록할 연수를 하나 이상 선택하세요.'; return; }
+    var position = document.getElementById('position').value;
+    var name = document.getElementById('name').value.trim();
+    if (!position) { errEl.textContent = '직위를 선택하세요.'; return; }
+    if (!name) { errEl.textContent = '성명을 입력하세요.'; return; }
+    if (!hasSign) { errEl.textContent = '서명을 입력하세요.'; return; }
+
+    btn.disabled = true; btn.innerHTML = '등록 중...';
+    var payload = {
+      events: events, meta: META,
+      school: SCHOOL_NAME, position: position,
+      name: name, signature: canvas.toDataURL('image/png')
+    };
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'register', payload: payload })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.error) throw new Error(res.error);
+        showCert(res);
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg> 등록하기';
+        errEl.textContent = (e && e.message) ? e.message : '등록 중 오류가 발생했습니다. 인터넷 연결을 확인해 주세요.';
+      });
+  };
+
+  function showCert(c) {
+    document.getElementById('c_events').innerHTML =
+      (c.events || []).map(function (e) { return escapeHtml(e.name); }).join('<br>');
+    document.getElementById('c_org').textContent = c.org;
+    document.getElementById('c_pos').textContent = c.position;
+    document.getElementById('c_name').innerHTML =
+      escapeHtml(c.name) + ' &nbsp; <img src="' + escapeHtml(c.signature) + '" alt="서명">';
+    document.getElementById('c_time').textContent = c.time;
+    document.getElementById('formView').style.display = 'none';
+    document.getElementById('doneView').style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+  document.getElementById('backBtn').onclick = function () {
+    document.getElementById('name').value = '';
+    var posSel = document.getElementById('position'); if (posSel) posSel.selectedIndex = 0;
+    document.querySelectorAll('.evt-check').forEach(function (b) { b.checked = true; });
+    ctx.clearRect(0, 0, canvas.width, canvas.height); hasSign = false;
+    errEl.textContent = '';
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg> 등록하기';
+    document.getElementById('doneView').style.display = 'none';
+    document.getElementById('formView').style.display = 'block';
+    window.scrollTo(0, 0);
+  };
+}
+</script>
+<p style="margin:24px auto 16px;max-width:520px;padding:0 16px;text-align:center;
+          font-size:11px;line-height:1.6;color:#9aa0a6;word-break:keep-all;">
+  통합연수등록부 &copy; 2026 KIMYERANG.<br>
+  학교에서 자유롭게 쓰실 수 있습니다. 만든 이의 허락 없이<br>
+  재배포하거나 자기 저작물로 공개하는 것은 금지하며,<br>
+  이 저작권 표시를 지우지 말아 주세요.
+</p>
+</body>
+</html>
