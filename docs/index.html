@@ -282,19 +282,29 @@ if (!API) {
   document.getElementById('adminLink').href = API + '?mode=admin';
   document.getElementById('footerArea').style.display = 'flex';
 
-  // 교표는 URL에 실으면 QR이 감당 못 할 만큼 커져서, 별도로 물어본다(없으면 그냥 학교명만).
-  fetch(API + '?mode=emblem')
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d && d.emblem) {
-        cropTransparentPadding_(d.emblem, function (cropped) {
-          var img = document.getElementById('emblemImg');
-          img.src = cropped;
-          img.style.display = 'inline-block';
-        });
-      }
-    })
-    .catch(function () { /* 교표 없이도 등록은 정상 동작 */ });
+  // logo= 로 미리 잘라둔 정적 이미지 주소를 받으면 그걸 바로 쓴다 — 구글 앱스스크립트
+  // 왕복 없이 이 페이지와 같은 곳(GitHub Pages)에서 즉시 온다. 없는 학교는 예전처럼
+  // ?mode=emblem 으로 구글 앱스스크립트에 물어본다(느리지만 별도 준비가 필요 없음).
+  var logoUrl = qs.get('logo');
+  if (logoUrl) {
+    var staticImg = document.getElementById('emblemImg');
+    staticImg.src = logoUrl;
+    staticImg.style.display = 'inline-block';
+  } else {
+    // 교표는 URL에 실으면 QR이 감당 못 할 만큼 커져서, 별도로 물어본다(없으면 그냥 학교명만).
+    fetch(API + '?mode=emblem')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.emblem) {
+          cropTransparentPadding_(d.emblem, function (cropped) {
+            var img = document.getElementById('emblemImg');
+            img.src = cropped;
+            img.style.display = 'inline-block';
+          });
+        }
+      })
+      .catch(function () { /* 교표 없이도 등록은 정상 동작 */ });
+  }
 
   /**
    * 학교 로고 PNG는 정사각형 캔버스 한가운데에 가로로 긴 그림이 있고 위아래가
