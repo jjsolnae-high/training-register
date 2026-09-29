@@ -10,6 +10,12 @@
  * - 여러 연수 통합 등록 + 연수별 담당자 지정
  * - 관리자: 행사 생성/링크 발급(일시·장소·대상·연수부서) + 명단 조회 + 2단 인쇄본 생성
  *
+ * 사전 명단(누가 안 왔는지 파악하기): 링크를 만들면 해당 연수 시트가 미리
+ * 생성된다. 담당자가 그 시트 9행부터 직위·성명만 채워두면(서명 칸은 비움),
+ * 참석자가 등록할 때 이름이 일치하는 그 행에 서명이 채워진다(findPrefilledRow_).
+ * 명단에 없는 사람(워크인)은 지금까지처럼 새 행으로 추가된다. 서명이 빈 행 =
+ * 아직 등록 안 한 사람.
+ *
  * 배포: Code.gs + Register.html + Admin.html → 웹 앱(실행:나, 액세스:모든 사용자)
  **************************************************************/
 
@@ -58,6 +64,12 @@ const VISIBLE_COLS = 4;
 /* 설치 안내 시트. 등록부가 아니라 읽을거리이므로 연수 목록에서 제외한다.
    이름을 바꾸시려면 여기만 고치면 됩니다. */
 const GUIDE_SHEET_NAME = '📖 설치 안내';
+
+/* 마스터 명단 시트. 직위·성명 두 열만 있는 '원본 명단'으로, 연수 목록에서
+   제외한다(등록부가 아니라 자료이므로). 직원 구성이 늘 똑같은 학교에서
+   한 번만 채워두면, 새로 만드는 연수 시트마다 이 명단이 자동으로 복사된다
+   (getEventSheet_ → getMasterRoster_ 참고). */
+const MASTER_ROSTER_SHEET_NAME = '📋 참석자 명단(직원 전체)';
 
 /* 교표를 담아두는 스크립트 속성 이름.
    비밀번호와 마찬가지로 사본에 딸려가지 않으므로, 다른 학교가 남의 교표를
@@ -182,21 +194,29 @@ function registerAttendance(data) {
     const now = new Date();
     const timeStr = Utilities.formatDate(now, ss.getSpreadsheetTimeZone(), 'yyyy. MM. dd. a hh:mm:ss')
       .replace('AM', '오전').replace('PM', '오후');
-    const rank = positionRank_(data.position);
 
     events.forEach(function (ev) {
       const sheet = getEventSheet_(ss, ev.name, ev.admin, ev.dept, meta);
-      sheet.appendRow([
-        '',                    // 번호(정렬 후 자동)
-        data.position || '',   // 직위
-        data.name || '',       // 성명
-        '',                    // 서명(셀 안 이미지)
-        timeStr,               // 등록시간(숨김)
-        data.signature || '',  // 서명데이터(숨김)
-        rank                   // 정렬키(숨김)
-      ]);
-      const row = sheet.getLastRow();
-      insertSignatureImage_(sheet, row, data.signature);
+      const prefilledRow = findPrefilledRow_(sheet, data.name);
+      if (prefilledRow) {
+        const posCell = sheet.getRange(prefilledRow, POS_COL);
+        if (!String(posCell.getValue() || '').trim()) posCell.setValue(data.position || '');
+        sheet.getRange(prefilledRow, TIME_COL).setValue(timeStr);
+        sheet.getRange(prefilledRow, SIG_DATA_COL).setValue(data.signature || '');
+        insertSignatureImage_(sheet, prefilledRow, data.signature);
+      } else {
+        sheet.appendRow([
+          '',                    // 번호(정렬 후 자동)
+          data.position || '',   // 직위
+          data.name || '',       // 성명
+          '',                    // 서명(셀 안 이미지)
+          timeStr,               // 등록시간(숨김)
+          data.signature || '',  // 서명데이터(숨김)
+          ''                     // 정렬키(숨김, sortSheet_이 채움)
+        ]);
+        const row = sheet.getLastRow();
+        insertSignatureImage_(sheet, row, data.signature);
+      }
       sortSheet_(sheet);
     });
     SpreadsheetApp.flush();
@@ -229,6 +249,30 @@ function positionRank_(pos) {
   return i === -1 ? 999 : i;
 }
 
+/**
+ * 담당자가 미리 적어둔 명단(성명 열)에서 이 등록자와 이름이 일치하는 행을
+ * 찾는다. 서명이 아직 없는 행을 우선한다 — 같은 이름이 두 번 등록되면
+ * (재서명) 이미 서명된 행을 덮어쓴다. 일치하는 행이 전혀 없으면(명단에
+ * 없는 워크인) null을 돌려주고, 호출한 쪽에서 새 행으로 추가한다.
+ */
+function findPrefilledRow_(sheet, name) {
+  const target = String(name || '').trim();
+  if (!target) return null;
+  const last = sheet.getLastRow();
+  const n = last - DATA_START_ROW + 1;
+  if (n < 1) return null;
+  const names = sheet.getRange(DATA_START_ROW, NAME_COL, n, 1).getValues();
+  const sigs = sheet.getRange(DATA_START_ROW, SIG_DATA_COL, n, 1).getValues();
+  let fallback = null;
+  for (var i = 0; i < n; i++) {
+    if (String(names[i][0] || '').trim() === target) {
+      if (!String(sigs[i][0] || '').trim()) return DATA_START_ROW + i;
+      if (fallback === null) fallback = DATA_START_ROW + i;
+    }
+  }
+  return fallback;
+}
+
 /** 서명 dataURL을 '셀 안 이미지'로 삽입 */
 function insertSignatureImage_(sheet, row, dataUrl) {
   if (!dataUrl || dataUrl.indexOf('data:image') !== 0) return;
@@ -244,6 +288,14 @@ function sortSheet_(sheet) {
   const n = last - DATA_START_ROW + 1;
   if (n < 1) return;
   try {
+    // 정렬키를 직위 열에서 매번 다시 계산해 전 행에 채운다. 담당자가 미리
+    // 적어둔(서명 전) 행은 스크립트를 거치지 않고 사람이 직접 타이핑하므로
+    // 정렬키가 비어 있다 — 그 행도 정렬키를 안 만들고 그냥 두면 안 그래도
+    // 결과가 불안정해진다.
+    const posVals = sheet.getRange(DATA_START_ROW, POS_COL, n, 1).getValues();
+    const keys = posVals.map(function (r) { return [positionRank_(r[0])]; });
+    sheet.getRange(DATA_START_ROW, SORT_KEY_COL, n, 1).setValues(keys);
+
     if (n >= 2) {
       sheet.getRange(DATA_START_ROW, 1, n, TOTAL_COLS).sort([
         { column: SORT_KEY_COL, ascending: true },
@@ -268,10 +320,35 @@ function getEventSheet_(ss, eventName, admin, dept, meta) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
     buildEventHeader_(sheet, eventName, admin, dept, meta);
+    prefillRosterRows_(ss, sheet);
   } else if (sheet.getRange(TABLE_HEADER_ROW, NO_COL).getValue() !== '번호') {
     buildEventHeader_(sheet, eventName, admin, dept, meta);
   }
   return sheet;
+}
+
+/**
+ * 마스터 명단 시트(직위·성명)를 읽는다. 시트가 없거나 비어 있으면 빈 배열.
+ * 이름 없는(빈) 줄은 건너뛴다.
+ */
+function getMasterRoster_(ss) {
+  const sh = ss.getSheetByName(MASTER_ROSTER_SHEET_NAME);
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const vals = sh.getRange(2, 1, last - 1, 2).getValues();
+  return vals
+    .map(function (r) { return { position: String(r[0] || '').trim(), name: String(r[1] || '').trim() }; })
+    .filter(function (p) { return p.name; });
+}
+
+/** 새로 만든(빈) 연수 시트에 마스터 명단을 미리 채워 넣는다. 명단이 없으면 아무것도 안 한다. */
+function prefillRosterRows_(ss, sheet) {
+  const roster = getMasterRoster_(ss);
+  if (!roster.length) return;
+  const rows = roster.map(function (p) { return ['', p.position, p.name, '', '', '', '']; });
+  sheet.getRange(DATA_START_ROW, 1, rows.length, TOTAL_COLS).setValues(rows);
+  sortSheet_(sheet);
 }
 
 /** 인쇄용 상단 서식(제목·학교명·정보란·표 머리글) 구성 */
@@ -370,6 +447,44 @@ function getAttendees(params) {
   return { headers: TABLE_HEADERS, count: rows.length, rows: rows };
 }
 
+/**
+ * 마스터 명단을 이미 만들어진 연수 시트에 채워 넣는다. 새 연수는
+ * getEventSheet_가 만들 때 자동으로 채우므로, 이 함수는 마스터 명단을
+ * 만들기 전에 이미 생성된 연수 시트를 위한 것이다. 이미 그 시트에 있는
+ * 이름(성명 일치)은 건너뛰어 중복으로 추가되지 않는다.
+ */
+function fillRosterIntoEvent(params) {
+  requireAdmin_(params);
+  const ss = openSpreadsheet_();
+  const sheet = params.eventTitle
+    ? ss.getSheetByName(sheetNameFor_(params.eventTitle))
+    : firstEventSheet_(ss);
+  if (!sheet) throw new Error('해당 연수 시트를 찾을 수 없습니다.');
+
+  const roster = getMasterRoster_(ss);
+  if (!roster.length) {
+    throw new Error('"' + MASTER_ROSTER_SHEET_NAME + '" 시트가 없거나 비어 있습니다. 먼저 직위·성명을 채우세요.');
+  }
+
+  const last = sheet.getLastRow();
+  const n = Math.max(0, last - DATA_START_ROW + 1);
+  const existingNames = {};
+  if (n > 0) {
+    sheet.getRange(DATA_START_ROW, NAME_COL, n, 1).getValues().forEach(function (r) {
+      const v = String(r[0] || '').trim();
+      if (v) existingNames[v] = true;
+    });
+  }
+  const toAdd = roster.filter(function (p) { return !existingNames[p.name]; });
+  if (!toAdd.length) return { added: 0 };
+
+  const rows = toAdd.map(function (p) { return ['', p.position, p.name, '', '', '', '']; });
+  sheet.getRange(last + 1, 1, rows.length, TOTAL_COLS).setValues(rows);
+  sortSheet_(sheet);
+  SpreadsheetApp.flush();
+  return { added: toAdd.length };
+}
+
 /* ===================== 관리자: 시트 목록 ===================== */
 function listEventSheets(params) {
   requireAdmin_(params);
@@ -417,7 +532,8 @@ function toggleEventClosed(params) {
  */
 function eventSheets_(ss) {
   return ss.getSheets().filter(function (s) {
-    return s.getName().indexOf(GUIDE_SHEET_NAME) !== 0;
+    const n = s.getName();
+    return n.indexOf(GUIDE_SHEET_NAME) !== 0 && n.indexOf(MASTER_ROSTER_SHEET_NAME) !== 0;
   });
 }
 
@@ -442,6 +558,21 @@ function encodeURIStrict_(str) {
 /* ===================== 관리자: 등록 링크 생성 ===================== */
 function buildRegisterLink(params) {
   requireAdmin_(params);
+  // 링크를 만드는 시점에 연수 시트(들)를 미리 만들어둔다. 그래야 담당자가
+  // QR을 뿌리기 전에 그 시트 9행부터 직위·성명을 미리 타이핑해둘 수 있다
+  // (findPrefilledRow_가 등록 시 그 행에 서명을 채운다). 이미 있으면
+  // getEventSheet_가 그대로 둔다.
+  const namesForSheet = Array.isArray(params.events) ? params.events : String(params.events || '').split(',');
+  const adminsForSheet = Array.isArray(params.admins) ? params.admins : String(params.admins || '').split(',');
+  const deptsForSheet = Array.isArray(params.depts) ? params.depts : String(params.depts || '').split(',');
+  const metaForSheet = { date: params.date || '', method: params.method || '', target: params.target || '' };
+  const ss = openSpreadsheet_();
+  namesForSheet.forEach(function (nm, i) {
+    const name = String(nm || '').trim();
+    if (!name) return;
+    getEventSheet_(ss, name, String(adminsForSheet[i] || '').trim(), String(deptsForSheet[i] || '').trim(), metaForSheet);
+  });
+
   // PUBLIC_REGISTER_URL이 있으면 참석자 링크를 script.google.com이 아니라
   // 거기(GitHub Pages 등 정적 페이지)로 발급한다. 그 페이지는 이 웹앱을
   // api= 파라미터로 받아 fetch()로만 호출하므로, mode=register 대신
@@ -618,6 +749,48 @@ function 교표지우기() {
   Logger.log('교표를 지웠습니다. 등록 화면에는 학교명만 나옵니다.');
 }
 
+/* ===================== 마스터 명단 =====================
+ * 서명 받을 사람(직원)이 연수마다 거의 똑같은 학교를 위한 기능이다.
+ * 한 번만 채워두면, 앞으로 새로 만드는 연수 시트마다 직위·성명이 자동으로
+ * 복사된다(getEventSheet_ → prefillRosterRows_). 참석자가 QR로 등록하면
+ * 이름이 일치하는 그 행에 서명이 채워진다(findPrefilledRow_).
+ */
+
+/**
+ * 마스터 명단 시트를 만든다. 쓰는 법
+ *   1. 편집기 함수 목록에서 '마스터명단시트만들기' 선택 → ▶ 실행
+ *   2. 생긴 시트의 2행부터 직위·성명을 한 줄에 한 명씩 채운다
+ * 이미 있으면 새로 만들지 않는다(직접 채운 명단을 지우지 않기 위함).
+ *
+ * ★ 이미 만들어져 있던 연수 시트에는 소급 적용되지 않는다 — 그 시트는
+ *   fillRosterIntoEvent(담당자 메뉴의 "마스터 명단 채우기" 버튼)로 채우거나
+ *   직접 타이핑하면 된다. 앞으로 새로 만드는 연수부터 자동으로 채워진다.
+ */
+function 마스터명단시트만들기() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('스프레드시트에서 [확장 프로그램 → Apps Script]로 열어 실행하세요.');
+
+  let sh = ss.getSheetByName(MASTER_ROSTER_SHEET_NAME);
+  if (sh) {
+    Logger.log('이미 "%s" 시트가 있습니다. 그 시트의 2행부터 직위·성명을 채우거나 고치면 됩니다.', MASTER_ROSTER_SHEET_NAME);
+    return;
+  }
+
+  sh = ss.insertSheet(MASTER_ROSTER_SHEET_NAME, 1);
+  sh.getRange(1, 1, 1, 2).setValues([['직위', '성명']])
+    .setFontWeight('bold').setBackground('#eef3fc')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 30);
+  sh.setColumnWidth(1, 110);
+  sh.setColumnWidth(2, 110);
+  sh.setFrozenRows(1);
+  SpreadsheetApp.flush();
+
+  Logger.log('"%s" 시트를 만들었습니다. 2행부터 직위·성명을 한 줄에 한 명씩 채우세요.', MASTER_ROSTER_SHEET_NAME);
+  Logger.log('앞으로 새로 만드는 연수 시트마다 이 명단이 자동으로 채워집니다.');
+  Logger.log('이미 만들어져 있던 연수 시트는 담당자 메뉴의 "마스터 명단 채우기" 버튼으로 나중에 채울 수 있습니다.');
+}
+
 /* ===================== 설치 안내 시트 =====================
  * 템플릿을 만드는 사람만 이 함수를 한 번 실행하면 된다.
  * 사본을 받는 학교는 실행할 필요가 없다 — 시트가 사본에 그대로 따라온다.
@@ -705,6 +878,24 @@ function guideContent_() {
     ['li', '④ [등록 링크 만들기] → [링크 복사]'],
     ['li', '⑤ 복사한 링크를 QR 생성 사이트(qr.naver.com 등)에 붙여넣고 이미지를 받으세요. 연수 PPT 첫 장에 띄우거나 출력해서 입구에 붙여두시면 됩니다.'],
     ['tip', '여러 연수를 한 번에 — 연수를 여러 줄 넣으면 참석자가 한 번의 서명으로 여러 연수에 등록됩니다. 각 연수는 별도 시트 탭에 따로 저장됩니다. 연수 서너 개를 몰아서 하는 날 유용합니다.'],
+    ['gap', ''],
+
+    ['h', '명단 미리 적어두기  (누가 안 왔는지 확인하려면, 선택사항)'],
+    ['p', '링크를 만들면 그 연수의 시트 탭이 미리 생깁니다(아직 아무도 등록 안 해도 생깁니다). 그 시트를 열어 9행부터 직위·성명만 채워두고 서명 칸은 비워두세요.'],
+    ['li', '① 담당자 메뉴에서 등록 링크를 만들면 시트 탭이 자동으로 생성됩니다.'],
+    ['li', '② 스프레드시트에서 그 탭을 열고, 표 9행부터 직위·성명 열에 참석 예정자를 한 명씩 적습니다. 번호·서명·정렬은 신경 쓰지 마세요 — 등록될 때 자동으로 채워집니다.'],
+    ['li', '③ 참석자가 QR로 등록하면, 적어둔 이름과 똑같은 행에 서명이 채워집니다. 서명 칸이 빈 행 = 아직 등록(참석) 안 한 사람입니다.'],
+    ['tip', '이름은 앞뒤 공백을 뺀 글자가 정확히 같아야 매칭됩니다. 명단에 없는 이름으로 등록하면(워크인) 지금까지처럼 표 맨 끝에 새 줄로 추가됩니다.'],
+    ['tip', '담당자 메뉴 [참석자 명단 조회]에서도 미등록자가 "미등록"으로 표시됩니다.'],
+    ['gap', ''],
+
+    ['h', '매번 같은 사람이 서명한다면 · 마스터 명단'],
+    ['p', '서명 받을 사람(교직원)이 연수마다 거의 같다면, 명단을 연수마다 새로 적을 필요 없이 한 번만 만들어두면 됩니다.'],
+    ['li', '① 편집기 위쪽 함수 목록에서 「마스터명단시트만들기」를 고르고 ▶ 실행합니다. 「📋 참석자 명단(직원 전체)」 시트가 생깁니다.'],
+    ['li', '② 그 시트 2행부터 직위·성명을 한 줄에 한 명씩(전 교직원) 채웁니다.'],
+    ['li', '③ 이제부터 새로 만드는 연수 시트는 이 명단이 자동으로 채워진 채로 생성됩니다. 등록만 받으면 됩니다.'],
+    ['tip', '이미 만들어져 있던 연수 시트에는 소급 적용되지 않습니다. 그 시트는 담당자 메뉴 [참석자 명단 조회] 탭의 [마스터 명단 채우기] 버튼을 누르면 마스터 명단 중 그 연수에 아직 없는 사람만 골라 추가합니다.'],
+    ['tip', '명단이 바뀌면(전입·전출) 「📋 참석자 명단(직원 전체)」 시트를 직접 고치세요. 이미 만들어진 연수 시트에는 영향이 없습니다.'],
     ['gap', ''],
 
     ['h', '연수가 끝난 뒤 · 출력하기'],

@@ -47,6 +47,8 @@
     th{background:#f0f4fb;color:#334;font-weight:700;white-space:nowrap;}
     td img{height:34px;}
     .count{font-size:14px;font-weight:700;color:var(--blue);margin:12px 0 4px;}
+    tr.pending{background:#fff8ec;}
+    .pending-tag{color:#8a5200;font-weight:700;font-size:12px;}
     .err{color:var(--red);font-size:14px;margin-top:8px;min-height:18px;}
     .tablescroll{overflow-x:auto;}
     .muted{color:var(--muted);font-size:14px;}
@@ -133,7 +135,8 @@
       <button class="btn ghost" id="printBtn">2단 인쇄본 만들기</button>
       <button class="btn ghost" id="closeBtn">마감하기</button>
     </div>
-    <div class="hint">'2단 인쇄본 만들기'를 누르면 순·직위·성명·서명을 좌·우 2단으로 배치한 <b>「연수명 (인쇄)」</b> 시트가 생성됩니다. '마감하기'를 누르면 이 연수는 그 즉시 등록 링크로 더 이상 등록할 수 없습니다(다시 눌러 재개 가능).</div>
+    <button class="btn ghost" id="fillRosterBtn" style="margin-top:8px;">마스터 명단 채우기</button>
+    <div class="hint">'2단 인쇄본 만들기'를 누르면 순·직위·성명·서명을 좌·우 2단으로 배치한 <b>「연수명 (인쇄)」</b> 시트가 생성됩니다. '마감하기'를 누르면 이 연수는 그 즉시 등록 링크로 더 이상 등록할 수 없습니다(다시 눌러 재개 가능). '마스터 명단 채우기'는 스프레드시트의 「📋 참석자 명단(직원 전체)」 시트에 있는 직위·성명을 이 연수에 없는 사람만 골라 추가합니다(새로 만드는 연수는 자동으로 채워지므로, 이미 만들어져 있던 연수에 쓰는 용도입니다).</div>
     <div class="err" id="l_err"></div>
     <div id="result"></div>
   </div>
@@ -211,6 +214,27 @@
         errEl.textContent = (e && e.message) ? e.message : '처리 중 오류가 발생했습니다.';
       })
       .toggleEventClosed({password: ADMIN_PW, eventTitle: name});
+  };
+
+  document.getElementById('fillRosterBtn').onclick = function(){
+    var name = document.getElementById('l_title').value;
+    var errEl = document.getElementById('l_err'); errEl.textContent = '';
+    if(!name){ errEl.textContent = '연수를 먼저 선택하세요.'; return; }
+    var btn = document.getElementById('fillRosterBtn');
+    btn.disabled = true;
+    var res = document.getElementById('result'); res.innerHTML='<p class="muted">채우는 중...</p>';
+    google.script.run
+      .withSuccessHandler(function(r){
+        btn.disabled = false;
+        res.innerHTML = '<p style="color:#16a34a;font-weight:700;">✅ '+r.added+'명을 새로 채웠습니다.</p>';
+        loadSheetList();
+      })
+      .withFailureHandler(function(e){
+        btn.disabled = false;
+        res.innerHTML = '';
+        errEl.textContent = (e && e.message) ? e.message : '처리 중 오류가 발생했습니다.';
+      })
+      .fillRosterIntoEvent({password: ADMIN_PW, eventTitle: name});
   };
 
   /* 탭 전환 */
@@ -307,17 +331,21 @@
 
   function renderTable(data){
     var res = document.getElementById('result');
-    if(!data.rows || !data.rows.length){ res.innerHTML='<p class="muted">등록된 참석자가 없습니다.</p>'; return; }
-    var html = '<div class="count">총 '+data.count+'명 등록</div>';
+    if(!data.rows || !data.rows.length){ res.innerHTML='<p class="muted">명단이 없습니다.</p>'; return; }
+    var signed = data.rows.filter(function(r){ return isSigDataUrl(r.signature); }).length;
+    var pending = data.rows.length - signed;
+    var html = '<div class="count">총 '+data.rows.length+'명 중 '+signed+'명 등록'
+      + (pending ? ' · <span class="pending-tag">미등록 '+pending+'명</span>' : '')+'</div>';
     html += '<div class="tablescroll"><table><thead><tr>'
       + '<th>번호</th><th>직위</th><th>성명</th><th>서명</th><th>등록시간</th>'
       + '</tr></thead><tbody>';
     data.rows.forEach(function(r,i){
-      html += '<tr><td>'+esc(r.no || (i+1))+'</td>'
+      var signedRow = isSigDataUrl(r.signature);
+      html += '<tr'+(signedRow?'':' class="pending"')+'><td>'+esc(r.no || (i+1))+'</td>'
         + '<td>'+esc(r.position)+'</td>'
         + '<td>'+esc(r.name)+'</td>'
-        + '<td>'+(isSigDataUrl(r.signature)
-            ? '<img src="'+esc(r.signature)+'">' : '')+'</td>'
+        + '<td>'+(signedRow
+            ? '<img src="'+esc(r.signature)+'">' : '<span class="pending-tag">미등록</span>')+'</td>'
         + '<td>'+esc(r.time)+'</td></tr>';
     });
     html += '</tbody></table></div>';
