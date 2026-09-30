@@ -269,8 +269,8 @@
     canvas.width = w * ratio; canvas.height = h * ratio;
     ctx.setTransform(1, 0, 0, 1, 0, 0);        // 변환 초기화(중복 scale 방지)
     ctx.scale(ratio, ratio);
-    ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#12233f';
+    ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#000000';
   }
   window.addEventListener('load', fitCanvas);
   setTimeout(fitCanvas, 60);
