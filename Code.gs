@@ -791,6 +791,89 @@ function 마스터명단시트만들기() {
   Logger.log('이미 만들어져 있던 연수 시트는 담당자 메뉴의 "마스터 명단 채우기" 버튼으로 나중에 채울 수 있습니다.');
 }
 
+/* ===================== 중복 행 정리 =====================
+ * 이 기능(이름이 일치하면 새 행 대신 기존 행에 덮어쓰기)을 적용하기 전에
+ * 이미 같은 사람이 여러 번 등록해 중복 행이 쌓였을 수 있다. 한 번만
+ * 실행해서 정리하는 일회성 함수다 — 평소에는 쓸 일이 없다(새 등록부터는
+ * findPrefilledRow_가 애초에 중복을 안 만든다).
+ */
+
+/**
+ * 모든 연수 시트를 훑어, 같은 성명이 여러 줄이면 등록시간이 가장 늦은
+ * 행만 남기고 나머지를 지운다. 서명이 없는(미등록) 행은 애초에 중복
+ * 판정에서 제외한다 — 미등록 행은 이름당 하나만 있어야 정상이므로
+ * 여러 개면 그것도 정리 대상이 되지만, 서명 있는 행이 하나라도 있으면
+ * 그중 최신 것만 남긴다.
+ *
+ * 실행법: 편집기 함수 목록에서 '중복행정리하기' 선택 → ▶ 실행.
+ * 결과는 실행 로그(Logger.log)로 나온다. 되돌릴 수 없으니, 걱정되면
+ * 실행 전에 스프레드시트를 [파일 → 사본 만들기]로 백업해두자.
+ */
+function 중복행정리하기() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('스프레드시트에서 [확장 프로그램 → Apps Script]로 열어 실행하세요.');
+
+  const sheets = eventSheets_(ss);
+  let totalRemoved = 0;
+  const report = [];
+
+  sheets.forEach(function (sheet) {
+    const last = sheet.getLastRow();
+    const n = last - DATA_START_ROW + 1;
+    if (n < 2) return;
+    const vals = sheet.getRange(DATA_START_ROW, 1, n, TOTAL_COLS).getValues();
+
+    const groups = {};
+    vals.forEach(function (r, i) {
+      const nm = String(r[NAME_COL - 1] || '').trim();
+      if (!nm) return;
+      if (!groups[nm]) groups[nm] = [];
+      groups[nm].push(i);
+    });
+
+    const removeIdx = {};
+    Object.keys(groups).forEach(function (nm) {
+      const idxs = groups[nm];
+      if (idxs.length < 2) return;
+      idxs.sort(function (a, b) {
+        const sa = String(vals[a][SIG_DATA_COL - 1] || '').trim() ? 1 : 0;
+        const sb = String(vals[b][SIG_DATA_COL - 1] || '').trim() ? 1 : 0;
+        if (sa !== sb) return sb - sa;                              // 서명 있는 쪽 우선
+        return parseTimeStr_(vals[b][TIME_COL - 1]) - parseTimeStr_(vals[a][TIME_COL - 1]); // 최신 시간 우선
+      });
+      for (var k = 1; k < idxs.length; k++) removeIdx[idxs[k]] = true;
+    });
+
+    const removeRows = Object.keys(removeIdx).map(Number).sort(function (a, b) { return b - a; });
+    if (!removeRows.length) return;
+    removeRows.forEach(function (i) { sheet.deleteRow(DATA_START_ROW + i); });
+    totalRemoved += removeRows.length;
+    report.push(sheet.getName() + ': ' + removeRows.length + '행 삭제');
+
+    sortSheet_(sheet);
+  });
+
+  SpreadsheetApp.flush();
+  if (!totalRemoved) {
+    Logger.log('중복으로 판단된 행이 없습니다.');
+  } else {
+    Logger.log('총 %s행을 정리했습니다.\n%s', totalRemoved, report.join('\n'));
+  }
+}
+
+/**
+ * '등록시간' 열 문자열("yyyy. MM. dd. 오전/오후 hh:mm:ss")을 비교 가능한
+ * 숫자(ms)로 바꾼다. 형식이 다르면(예: 수동으로 지운 경우) 0.
+ */
+function parseTimeStr_(s) {
+  const m = String(s || '').match(/(\d{4})\.\s*(\d{2})\.\s*(\d{2})\.\s*(오전|오후)\s*(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  let h = parseInt(m[5], 10);
+  if (m[4] === '오후' && h < 12) h += 12;
+  if (m[4] === '오전' && h === 12) h = 0;
+  return new Date(+m[1], +m[2] - 1, +m[3], h, +m[6], +m[7]).getTime();
+}
+
 /* ===================== 설치 안내 시트 =====================
  * 템플릿을 만드는 사람만 이 함수를 한 번 실행하면 된다.
  * 사본을 받는 학교는 실행할 필요가 없다 — 시트가 사본에 그대로 따라온다.
@@ -915,6 +998,7 @@ function guideContent_() {
     ['li', '참석자가 로그인을 요구받음 → 4단계에서 액세스가 "모든 사용자"가 아님'],
     ['li', '고친 게 반영이 안 됨 → 재배포를 안 함. 위 "재배포" 참고'],
     ['li', '서명이 시트에 안 보임 → 서명 열 너비나 행 높이가 눌린 경우. CONFIG 의 SIG_COL_WIDTH · SIG_ROW_HEIGHT 조정'],
+    ['li', '같은 사람이 여러 줄로 중복 등록됨(이 기능을 적용하기 전에 등록된 것들) → 편집기 함수 목록에서 「중복행정리하기」 실행. 등록시간이 가장 늦은 줄만 남기고 나머지를 지운다(되돌릴 수 없으니 걱정되면 실행 전 시트를 사본으로 백업)'],
     ['gap', ''],
 
     ['h', '개인정보 관련'],
