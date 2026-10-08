@@ -112,6 +112,12 @@
   .err{color:var(--red);font-size:14px;margin-top:8px;text-align:center;min-height:18px;font-weight:600;}
   .apierr{max-width:500px;margin:40px auto;padding:24px;text-align:center;color:var(--red);
     font-size:15px;line-height:1.6;}
+  select{text-overflow:ellipsis;}
+  .evtpicked{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+  .evtsel{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;
+    border:1.5px solid var(--blue);border-radius:14px;padding:12px 14px;font-size:15px;font-weight:600;line-height:1.4;}
+  .evtsel button{border:none;background:var(--blue-soft);color:var(--blue);width:28px;height:28px;
+    border-radius:50%;font-size:18px;line-height:1;cursor:pointer;flex:none;}
 </style>
 </head>
 <body>
@@ -139,7 +145,7 @@
     <div class="field">
       <div class="label">
         <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
-        등록할 연수 <span class="req">*</span>
+        등록할 수업 <span class="req">*</span>
       </div>
       <div id="eventArea"></div>
     </div>
@@ -200,7 +206,7 @@
       <div class="stamp">등록확인</div>
       <h3>수업 참관 등록 확인증</h3>
       <div class="hr"></div>
-      <div class="row"><div class="k">등록 연수</div><div class="v" id="c_events"></div></div>
+      <div class="row"><div class="k">등록 수업</div><div class="v" id="c_events"></div></div>
       <div class="row"><div class="k">소속기관</div><div class="v" id="c_org"></div></div>
       <div class="row"><div class="k">직 위</div><div class="v" id="c_pos"></div></div>
       <div class="row"><div class="k">성명/서명</div><div class="v" id="c_name"></div></div>
@@ -346,28 +352,47 @@ if (!API) {
     img.src = dataUrl;
   }
 
+  var selected = [];
   var eventArea = document.getElementById('eventArea');
-  if (EVENT_LIST.length > 1) {
-    var box = document.createElement('div');
-    box.className = 'evtlist';
-    EVENT_LIST.forEach(function (ev) {
-      var label = document.createElement('label');
-      label.innerHTML =
-        '<input type="checkbox" class="evt-check" value="' + escapeHtml(ev.name) + '" data-admin="' + escapeHtml(ev.admin) + '" data-dept="' + escapeHtml(ev.dept) + '" checked>' +
-        '<span>' + escapeHtml(ev.name) + (ev.admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(ev.admin) + '</small>' : '') + '</span>';
-      box.appendChild(label);
+  function renderEvents() {
+    eventArea.innerHTML = '';
+    if (EVENT_LIST.length === 1) {
+      selected = [EVENT_LIST[0]];
+      var one = document.createElement('div');
+      one.className = 'evtone';
+      one.innerHTML = escapeHtml(EVENT_LIST[0].name) + (EVENT_LIST[0].admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(EVENT_LIST[0].admin) + '</small>' : '');
+      eventArea.appendChild(one);
+      return;
+    }
+    var wrap = document.createElement('div');
+    wrap.className = 'selectbox';
+    var sel = document.createElement('select');
+    sel.innerHTML = '<option value="">참관한 수업을 선택하세요</option>' + EVENT_LIST.map(function (ev, i) {
+      return selected.indexOf(ev) === -1 ? '<option value="' + i + '">' + escapeHtml(ev.name) + '</option>' : '';
+    }).join('');
+    sel.onchange = function () {
+      if (sel.value !== '') { selected.push(EVENT_LIST[Number(sel.value)]); renderEvents(); }
+    };
+    wrap.appendChild(sel);
+    eventArea.appendChild(wrap);
+    var list = document.createElement('div');
+    list.className = 'evtpicked';
+    if (!selected.length) {
+      list.innerHTML = '<div class="sighint">선택한 수업이 여기에 표시됩니다. 여러 수업을 참관했다면 계속 선택하세요.</div>';
+    }
+    selected.forEach(function (ev) {
+      var row = document.createElement('div');
+      row.className = 'evtsel';
+      row.innerHTML = '<span>' + escapeHtml(ev.name) + (ev.admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(ev.admin) + '</small>' : '') + '</span>';
+      var x = document.createElement('button');
+      x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', '선택 취소');
+      x.onclick = function () { selected.splice(selected.indexOf(ev), 1); renderEvents(); };
+      row.appendChild(x);
+      list.appendChild(row);
     });
-    eventArea.appendChild(box);
-    var hint = document.createElement('div');
-    hint.className = 'sighint';
-    hint.textContent = '참석한 연수를 모두 선택하세요. (기본: 전체 선택)';
-    eventArea.appendChild(hint);
-  } else {
-    var one = document.createElement('div');
-    one.className = 'evtone';
-    one.innerHTML = escapeHtml(EVENT_LIST[0].name) + (EVENT_LIST[0].admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(EVENT_LIST[0].admin) + '</small>' : '');
-    eventArea.appendChild(one);
+    eventArea.appendChild(list);
   }
+  renderEvents();
 
   var posSelect = document.getElementById('position');
   positions.forEach(function (p) {
@@ -428,11 +453,8 @@ if (!API) {
   var errEl = document.getElementById('err');
   btn.onclick = function () {
     errEl.textContent = '';
-    var events = [];
-    var boxes = document.querySelectorAll('.evt-check');
-    if (boxes.length) { boxes.forEach(function (b) { if (b.checked) events.push({ name: b.value, admin: b.getAttribute('data-admin') || '', dept: b.getAttribute('data-dept') || '' }); }); }
-    else { events = EVENT_LIST.slice(); }
-    if (!events.length) { errEl.textContent = '등록할 연수를 하나 이상 선택하세요.'; return; }
+    var events = selected.slice();
+    if (!events.length) { errEl.textContent = '등록할 수업을 하나 이상 선택하세요.'; return; }
     var org = document.getElementById('org').value.trim();
     var position = document.getElementById('position').value;
     var name = document.getElementById('name').value.trim();
@@ -480,7 +502,7 @@ if (!API) {
     document.getElementById('org').value = '';
     document.getElementById('name').value = '';
     var posSel = document.getElementById('position'); if (posSel) posSel.selectedIndex = 0;
-    document.querySelectorAll('.evt-check').forEach(function (b) { b.checked = true; });
+    selected = []; renderEvents();
     ctx.clearRect(0, 0, canvas.width, canvas.height); hasSign = false;
     errEl.textContent = '';
     btn.disabled = false;
