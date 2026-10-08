@@ -242,13 +242,15 @@ function webSafeB64Decode(s) {
     return new TextDecoder('utf-8').decode(bytes);
   } catch (e) { return ''; }
 }
+// 맨 앞 줄바꿈 = 새 방식(줄바꿈 구분, 연수명 안의 콤마 허용). 없으면 예전 링크라 콤마로 푼다.
+function splitDecoded(s) { return s.charAt(0) === '\n' ? s.slice(1).split('\n') : s.split(','); }
 function decodeCsvList(param) {
   if (!param) return [];
-  return webSafeB64Decode(param).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  return splitDecoded(webSafeB64Decode(param)).map(function (s) { return s.trim(); }).filter(Boolean);
 }
 function decodeCsvRaw(param) {
   if (!param) return [];
-  return webSafeB64Decode(param).split(',').map(function (s) { return s.trim(); });
+  return splitDecoded(webSafeB64Decode(param)).map(function (s) { return s.trim(); });
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, function (m) {
