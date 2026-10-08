@@ -265,7 +265,8 @@ function escapeHtml(s) {
 }
 
 var qs = new URLSearchParams(location.search);
-var API = qs.get('api') || '';
+// g= 는 웹앱 배포 ID만 실은 짧은 형태(QR을 작게 하려고). api= 는 예전 링크용 전체 주소.
+var API = qs.get('api') || (qs.get('g') ? 'https://script.google.com/macros/s/' + qs.get('g') + '/exec' : '');
 
 if (!API) {
   document.getElementById('apiErr').style.display = 'block';
@@ -279,7 +280,7 @@ if (!API) {
   var evDepts = decodeCsvRaw(qs.get('depts'));
   var EVENT_LIST = evNames.map(function (n, i) { return { name: n, admin: evAdmins[i] || '', dept: evDepts[i] || '' }; });
   var eventTitle = qs.get('title') || (evNames.length === 1 ? evNames[0] : '수업 참관 등록');
-  var SCHOOL_NAME = qs.get('school') || '';
+  var SCHOOL_NAME = qs.get('school') || '전주솔내고등학교';
   var positions = decodeCsvList(qs.get('pos'));
   if (!positions.length) positions = DEFAULT_POSITIONS;
   var META = { date: qs.get('date') || '', method: qs.get('method') || '', target: qs.get('target') || '' };
@@ -292,7 +293,7 @@ if (!API) {
   // logo= 로 미리 잘라둔 정적 이미지 주소를 받으면 그걸 바로 쓴다 — 구글 앱스스크립트
   // 왕복 없이 이 페이지와 같은 곳(GitHub Pages)에서 즉시 온다. 없는 학교는 예전처럼
   // ?mode=emblem 으로 구글 앱스스크립트에 물어본다(느리지만 별도 준비가 필요 없음).
-  var logoUrl = qs.get('logo');
+  var logoUrl = qs.get('logo') || '../assets/emblem-jjsolnae.png';
   if (logoUrl) {
     var staticImg = document.getElementById('emblemImg');
     staticImg.src = logoUrl;
