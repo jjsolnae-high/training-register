@@ -266,11 +266,10 @@ if (!API) {
 
   var evNames = decodeCsvList(qs.get('events'));
   if (!evNames.length && qs.get('title')) evNames = [qs.get('title')];
-  if (!evNames.length) evNames = ['연수 참석 등록'];
   var evAdmins = decodeCsvRaw(qs.get('admins'));
   var evDepts = decodeCsvRaw(qs.get('depts'));
   var EVENT_LIST = evNames.map(function (n, i) { return { name: n, admin: evAdmins[i] || '', dept: evDepts[i] || '' }; });
-  var eventTitle = qs.get('title') || (evNames.length === 1 ? evNames[0] : '연수 참석 등록');
+  var eventTitle = qs.get('title') || (evNames.length === 1 ? evNames[0] : (evNames.length > 1 ? '연수 참석 등록' : '연수 등록'));
   var SCHOOL_NAME = qs.get('school') || '';
   var positions = decodeCsvList(qs.get('pos'));
   if (!positions.length) positions = DEFAULT_POSITIONS;
@@ -346,26 +345,27 @@ if (!API) {
   }
 
   var eventArea = document.getElementById('eventArea');
-  if (EVENT_LIST.length > 1) {
+  if (EVENT_LIST.length > 0) {
     var box = document.createElement('div');
     box.className = 'evtlist';
     EVENT_LIST.forEach(function (ev) {
       var label = document.createElement('label');
       label.innerHTML =
-        '<input type="checkbox" class="evt-check" value="' + escapeHtml(ev.name) + '" data-admin="' + escapeHtml(ev.admin) + '" data-dept="' + escapeHtml(ev.dept) + '" checked>' +
+        '<input type="checkbox" class="evt-check" value="' + escapeHtml(ev.name) + '" data-admin="' + escapeHtml(ev.admin) + '" data-dept="' + escapeHtml(ev.dept) + '">' +
         '<span>' + escapeHtml(ev.name) + (ev.admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(ev.admin) + '</small>' : '') + '</span>';
       box.appendChild(label);
     });
     eventArea.appendChild(box);
     var hint = document.createElement('div');
     hint.className = 'sighint';
-    hint.textContent = '참석한 연수를 모두 선택하세요. (기본: 전체 선택)';
+    hint.textContent = '참석한 연수를 체크하세요.' + (EVENT_LIST.length > 1 ? ' (복수 선택 가능)' : '');
     eventArea.appendChild(hint);
   } else {
-    var one = document.createElement('div');
-    one.className = 'evtone';
-    one.innerHTML = escapeHtml(EVENT_LIST[0].name) + (EVENT_LIST[0].admin ? '<small class="evt-admin"> · 담당 ' + escapeHtml(EVENT_LIST[0].admin) + '</small>' : '');
-    eventArea.appendChild(one);
+    var empty = document.createElement('div');
+    empty.className = 'evt-empty';
+    empty.style.cssText = 'padding:14px 16px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:14px;color:#dc2626;font-size:14px;line-height:1.5;';
+    empty.innerHTML = '등록할 연수가 지정되지 않았습니다.<br>담당자가 안내한 올바른 링크(QR코드)로 접속해 주세요.';
+    eventArea.appendChild(empty);
   }
 
   var posSelect = document.getElementById('position');
@@ -428,10 +428,10 @@ if (!API) {
   btn.onclick = function () {
     errEl.textContent = '';
     var events = [];
-    var boxes = document.querySelectorAll('.evt-check');
-    if (boxes.length) { boxes.forEach(function (b) { if (b.checked) events.push({ name: b.value, admin: b.getAttribute('data-admin') || '', dept: b.getAttribute('data-dept') || '' }); }); }
-    else { events = EVENT_LIST.slice(); }
-    if (!events.length) { errEl.textContent = '등록할 연수를 하나 이상 선택하세요.'; return; }
+    document.querySelectorAll('.evt-check').forEach(function (b) {
+      if (b.checked) events.push({ name: b.value, admin: b.getAttribute('data-admin') || '', dept: b.getAttribute('data-dept') || '' });
+    });
+    if (!events.length) { errEl.textContent = '등록할 연수를 선택하세요.'; return; }
     var position = document.getElementById('position').value;
     var name = document.getElementById('name').value.trim();
     if (!position) { errEl.textContent = '직위를 선택하세요.'; return; }
@@ -476,7 +476,7 @@ if (!API) {
   document.getElementById('backBtn').onclick = function () {
     document.getElementById('name').value = '';
     var posSel = document.getElementById('position'); if (posSel) posSel.selectedIndex = 0;
-    document.querySelectorAll('.evt-check').forEach(function (b) { b.checked = true; });
+    document.querySelectorAll('.evt-check').forEach(function (b) { b.checked = false; });
     ctx.clearRect(0, 0, canvas.width, canvas.height); hasSign = false;
     errEl.textContent = '';
     btn.disabled = false;

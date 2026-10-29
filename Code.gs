@@ -108,11 +108,11 @@ function doGet(e) {
   }
 
   const t = HtmlService.createTemplateFromFile('Register');
-  const evNames  = decodeList_(p.events) || (p.title ? [p.title] : ['연수 참석 등록']);
+  const evNames  = decodeList_(p.events) || (p.title ? [p.title] : []);
   const evAdmins = decodeRaw_(p.admins);
   const evDepts  = decodeRaw_(p.depts);
   t.eventList  = evNames.map(function (n, i) { return { name: n, admin: evAdmins[i] || '', dept: evDepts[i] || '' }; });
-  t.eventTitle = p.title || (evNames.length === 1 ? evNames[0] : '연수 참석 등록');
+  t.eventTitle = p.title || (evNames.length === 1 ? evNames[0] : (evNames.length > 1 ? '연수 참석 등록' : '연수 등록'));
   t.orgName      = CONFIG.ORG_NAME;
   t.webAppUrl    = getWebAppUrl_();
   t.schoolName   = p.school  || CONFIG.SCHOOL_NAME;

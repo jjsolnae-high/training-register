@@ -156,18 +156,20 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="#1a4fb4" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
         등록할 연수 <span class="req">*</span>
       </div>
-      <? if (eventList.length > 1) { ?>
+      <? if (eventList.length > 0) { ?>
         <div class="evtlist">
           <? for (var i = 0; i < eventList.length; i++) { ?>
             <label>
-              <input type="checkbox" class="evt-check" value="<?= eventList[i].name ?>" data-admin="<?= eventList[i].admin ?>" data-dept="<?= eventList[i].dept ?>" checked>
+              <input type="checkbox" class="evt-check" value="<?= eventList[i].name ?>" data-admin="<?= eventList[i].admin ?>" data-dept="<?= eventList[i].dept ?>">
               <span><?= eventList[i].name ?><? if (eventList[i].admin) { ?><small class="evt-admin"> · 담당 <?= eventList[i].admin ?></small><? } ?></span>
             </label>
           <? } ?>
         </div>
-        <div class="sighint" style="margin-top:8px;padding-left:2px;">참석한 연수를 모두 선택하세요. (기본: 전체 선택)</div>
+        <div class="sighint" style="margin-top:8px;padding-left:2px;">참석한 연수를 체크하세요.<?= eventList.length > 1 ? ' (복수 선택 가능)' : '' ?></div>
       <? } else { ?>
-        <div class="evtone"><?= eventList[0].name ?><? if (eventList[0].admin) { ?><small class="evt-admin"> · 담당 <?= eventList[0].admin ?></small><? } ?></div>
+        <div class="evt-empty" style="padding:14px 16px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:14px;color:#dc2626;font-size:14px;line-height:1.5;">
+          등록할 연수가 지정되지 않았습니다.<br>담당자가 안내한 올바른 링크(QR코드)로 접속해 주세요.
+        </div>
       <? } ?>
     </div>
 
@@ -308,10 +310,10 @@
   btn.onclick = function(){
     errEl.textContent = '';
     var events = [];
-    var boxes = document.querySelectorAll('.evt-check');
-    if(boxes.length){ boxes.forEach(function(b){ if(b.checked) events.push({name:b.value, admin:b.getAttribute('data-admin')||'', dept:b.getAttribute('data-dept')||''}); }); }
-    else { events = EVENT_LIST.slice(); }
-    if(!events.length){ errEl.textContent='등록할 연수를 하나 이상 선택하세요.'; return; }
+    document.querySelectorAll('.evt-check').forEach(function(b){
+      if(b.checked) events.push({name:b.value, admin:b.getAttribute('data-admin')||'', dept:b.getAttribute('data-dept')||''});
+    });
+    if(!events.length){ errEl.textContent='등록할 연수를 선택하세요.'; return; }
     var position = document.getElementById('position').value;
     var name = document.getElementById('name').value.trim();
     if(!position){ errEl.textContent='직위를 선택하세요.'; return; }
@@ -348,7 +350,7 @@
   document.getElementById('backBtn').onclick = function(){
     document.getElementById('name').value = '';
     var posSel = document.getElementById('position'); if(posSel) posSel.selectedIndex = 0;
-    document.querySelectorAll('.evt-check').forEach(function(b){ b.checked = true; });
+    document.querySelectorAll('.evt-check').forEach(function(b){ b.checked = false; });
     ctx.clearRect(0, 0, canvas.width, canvas.height); hasSign = false;
     errEl.textContent = '';
     btn.disabled = false;
