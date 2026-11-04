@@ -40,7 +40,7 @@ const CONFIG = {
   // 비우면('') ?mode=emblem으로 매번 물어봐서 로고가 늦게 뜬다. 직접 준비할
   // 수 있는 학교는 여백 없이 자른 로고 파일을 어딘가(예: 이 저장소의 docs/assets/)에
   // 올리고 그 주소를 넣으면 된다.
-  PUBLIC_LOGO_URL: '',
+  PUBLIC_LOGO_URL: 'https://jjsolnae-high.github.io/training-register/assets/emblem-jjsolnae.png',
   AUTHUSER: '0',                        // 링크에 authuser 파라미터 자동 추가(계정 꼬임 방지). 비우면('') 미추가
   DEFAULT_POSITIONS: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
   POSITION_ORDER: ['교장', '교감', '행정실장', '수석교사', '교사', '주무관', '교무실무사', '특수지도사', '기숙사사감', '시설관리원', '행정실무사', '영양실무사'],
